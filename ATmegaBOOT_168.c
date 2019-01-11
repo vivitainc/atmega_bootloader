@@ -7,6 +7,8 @@
 /* ATmegaBOOT.c                                           */
 /*                                                        */
 /*                                                        */
+/* 20181218: added signature read support and VIVIPARTS   */
+/*           GPIO operation by T.Hayashi VIVITA Inc.      */
 /* 20090308: integrated Mega changes into main bootloader */
 /*           source by D. Mellis                          */
 /* 20080930: hacked for Arduino Mega (with the 1280       */
@@ -70,6 +72,7 @@
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <util/delay.h>
+#include <avr/boot.h>
 
 /* the current avr-libc eeprom functions do not support the ATmega168 */
 /* own eeprom write/read functions are used instead */
@@ -135,10 +138,10 @@
 #else
 /* Onboard LED is connected to pin PB5 in Arduino NG, Diecimila, and Duomilanuove */ 
 /* other boards like e.g. Crumb8, Crumb168 are using PB2 */
-#define LED_DDR  DDRB
-#define LED_PORT PORTB
-#define LED_PIN  PINB
-#define LED      PINB5
+#define LED_DDR  DDRD
+#define LED_PORT PORTD
+#define LED_PIN  PIND
+#define LED      PIND6
 #endif
 
 
@@ -233,6 +236,16 @@
 #define PAGE_SIZE	0x20U	//32 words
 #endif
 
+#define SIGRD 5
+
+// Debug Macro
+#define Debug1ByteHexPut(v)                                 \
+  if (((v >> 4) & 0x0F) > 9) {                              \
+    putch((char)('A' + ((uint8_t)((v >> 4) & 0x0F) - 10))); \
+  } else { putch('0' + (uint8_t)((v >> 4) & 0x0F)); }       \
+  if ((v & 0x0F) > 9) {                                     \
+    putch((char)('A' + ((uint8_t)(v & 0x0F) - 10)));        \
+  } else { putch('0' + (uint8_t)(v & 0x0F)); }
 
 /* function prototypes */
 void putch(char);
@@ -278,6 +291,11 @@ int main(void)
 {
 	uint8_t ch,ch2;
 	uint16_t w;
+	uint8_t signature[3];
+
+	signature[0] = SIG1;
+	signature[1] = SIG2;
+	signature[2] = SIG3;
 
 #ifdef WATCHDOG_MODS
 	ch = MCUSR;
@@ -419,6 +437,12 @@ int main(void)
 	/* set LED pin as output */
 	LED_DDR |= _BV(LED);
 
+	// PIN_EN_TX to low
+	DDRB |= _BV(PINB0);
+	PORTB &= ~_BV(PINB0);
+	// PIN_EN_RX to high
+	DDRD |= _BV(PIND7);
+	PORTD |= _BV(PIND7);
 
 	/* flash onboard LED to signal entering of bootloader */
 #if defined(__AVR_ATmega128__) || defined(__AVR_ATmega1280__)
@@ -431,6 +455,10 @@ int main(void)
 	/* 20050803: by DojoCorp, this is one of the parts provoking the
 		 system to stop listening, cancelled from the original */
 	//putch('\0');
+
+	signature[0] = boot_signature_byte_get(0x00); // Value of SIGROW_DEVICEID0
+	signature[1] = boot_signature_byte_get(0x02); // Value of SIGROW_DEVICEID1
+	signature[2] = boot_signature_byte_get(0x04); // Value of SIGROW_DEVICEID2
 
 	/* forever loop */
 	for (;;) {
@@ -535,11 +563,11 @@ int main(void)
 			ch = getch();
 			getch();
 			if (ch == 0) {
-				byte_response(SIG1);
+				byte_response(signature[0]);
 			} else if (ch == 1) {
-				byte_response(SIG2); 
+				byte_response(signature[1]);
 			} else {
-				byte_response(SIG3);
+				byte_response(signature[2]);
 			} 
 		} else {
 			getNch(3);
@@ -744,9 +772,9 @@ int main(void)
 	else if(ch=='u') {
 		if (getch() == ' ') {
 			putch(0x14);
-			putch(SIG1);
-			putch(SIG2);
-			putch(SIG3);
+			putch(signature[0]);
+			putch(signature[1]);
+			putch(signature[2]);
 			putch(0x10);
 		} else {
 			if (++error_count == MAX_ERROR_COUNT)
@@ -922,6 +950,8 @@ void puthex(char ch) {
 
 void putch(char ch)
 {
+	// PIN_EN_TX to high
+	PORTB |= _BV(PINB0);
 #if defined(__AVR_ATmega128__) || defined(__AVR_ATmega1280__)
 	if(bootuart == 1) {
 		while (!(UCSR0A & _BV(UDRE0)));
