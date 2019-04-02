@@ -7,6 +7,8 @@
 /* ATmegaBOOT.c                                           */
 /*                                                        */
 /*                                                        */
+/* 20190118: turned off watchdog to avoid reiterate reset */
+/*           if wd trigger in app by T.Hayashi VIVITA Inc.*/
 /* 20181218: added signature read support and VIVIPARTS   */
 /*           GPIO operation by T.Hayashi VIVITA Inc.      */
 /* 20090308: integrated Mega changes into main bootloader */
@@ -308,6 +310,9 @@ int main(void)
 	if (! (ch &  _BV(EXTRF))) // if its a not an external reset...
 		app_start();  // skip bootloader
 #else
+	MCUSR = 0;
+	WDTCSR |= _BV(WDCE) | _BV(WDE);
+	WDTCSR = 0;
 	asm volatile("nop\n\t");
 #endif
 
@@ -437,12 +442,14 @@ int main(void)
 	/* set LED pin as output */
 	LED_DDR |= _BV(LED);
 
+#if defined(VPARTS_EN_TX_RX_OPERATION)
 	// PIN_EN_TX to low
 	DDRB |= _BV(PINB0);
 	PORTB &= ~_BV(PINB0);
 	// PIN_EN_RX to high
 	DDRD |= _BV(PIND7);
 	PORTD |= _BV(PIND7);
+#endif
 
 	/* flash onboard LED to signal entering of bootloader */
 #if defined(__AVR_ATmega128__) || defined(__AVR_ATmega1280__)
@@ -950,8 +957,10 @@ void puthex(char ch) {
 
 void putch(char ch)
 {
+#if defined(VPARTS_EN_TX_RX_OPERATION)
 	// PIN_EN_TX to high
 	PORTB |= _BV(PINB0);
+#endif
 #if defined(__AVR_ATmega128__) || defined(__AVR_ATmega1280__)
 	if(bootuart == 1) {
 		while (!(UCSR0A & _BV(UDRE0)));

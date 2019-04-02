@@ -182,7 +182,7 @@ atmega328_notp_isp: isp
 
 atmega328_pro8: TARGET = atmega328_pro_8MHz_vparts
 atmega328_pro8: MCU_TARGET = atmega328p
-atmega328_pro8: CFLAGS += '-DMAX_TIME_COUNT=F_CPU>>4' '-DNUM_LED_FLASHES=1' -DBAUD_RATE=57600 -DDOUBLE_SPEED
+atmega328_pro8: CFLAGS += '-DMAX_TIME_COUNT=F_CPU>>4' '-DNUM_LED_FLASHES=1' -DBAUD_RATE=57600 -DDOUBLE_SPEED -DVPARTS_EN_TX_RX_OPERATION
 atmega328_pro8: AVR_FREQ = 8000000L
 atmega328_pro8: LDSECTION  = --section-start=.text=0x7800
 atmega328_pro8: $(PROGRAM)_atmega328_pro_8MHz_vparts.hex
